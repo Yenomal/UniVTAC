@@ -15,6 +15,13 @@ cd UniVTAC
 bash scripts/install.sh
 ```
 
+Verify the completed installation from the `UniVTAC` Conda environment:
+
+```bash
+conda activate UniVTAC
+python scripts/eval-env.py
+```
+
 See the [Installation Guide](./docs/Installation.md) for detailed setup instructions, including installing the environment, installing TacEx from the modified local source and setting up cuRobo for motion planning.
 
 ## Task Gallery

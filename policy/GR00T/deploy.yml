@@ -1,0 +1,15 @@
+policy_name: GR00T
+
+# This test adapter targets the OXE-DROID modality schema in the local
+# GR00T-N1.7-3B checkpoint. The model still consumes eef_9d state, but the
+# adapter executes only decoded joint_position + gripper_position actions.
+embodiment_tag: OXE_DROID_RELATIVE_EEF_RELATIVE_JOINT
+model_path: /root/workspace/pi-r2-GR00T/ckpt/GR00T-N1.7-3B
+
+host: 127.0.0.1
+port: 5555
+timeout_ms: 60000
+slide_steps: 1
+
+language: ""
+
