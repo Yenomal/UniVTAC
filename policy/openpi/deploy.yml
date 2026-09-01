@@ -1,0 +1,8 @@
+policy_name: openpi
+host: 127.0.0.1
+port: 8000
+side_camera: head
+wrist_camera: wrist
+state_dim: 8
+# Omit for a checkpoint trained directly on UniVTAC Panda qpos actions.
+# action_indices: [0, 1, 2, 3, 4, 5, 6, 7]

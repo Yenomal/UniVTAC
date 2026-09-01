@@ -1,0 +1,12 @@
+policy_name: streaming_openpi
+host: 127.0.0.1
+fm_port: 8000
+vlm_port: 8001
+side_camera: head
+wrist_camera: wrist
+state_dim: 8
+session_prefix: univtac
+num_steps: 10
+vlm_refresh_interval_actions: 10
+# Omit for a checkpoint trained directly on UniVTAC Panda qpos actions.
+# action_indices: [0, 1, 2, 3, 4, 5, 6, 7]
