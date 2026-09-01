@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+set -eE
+
+trap 'status=$?; echo "[ERROR] install.sh failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "${status}"' ERR
 
 CONDA_ENV_NAME="UniVTAC"
 load_env() {
@@ -13,8 +15,7 @@ load_env() {
     source ${conda_base}/etc/profile.d/conda.sh
 
     # step 1: create conda environment
-    is_conda_env_exists=$(conda env list | grep ${CONDA_ENV_NAME})
-    if [ -z "$is_conda_env_exists" ]; then
+    if ! conda env list | awk '{print $1}' | grep -Fxq "${CONDA_ENV_NAME}"; then
         echo "Creating conda environment '${CONDA_ENV_NAME}'..."
         conda create -n ${CONDA_ENV_NAME} python=3.10 -y
         conda env update -n ${CONDA_ENV_NAME} --file ./third_party/TacEx/source/tacex_uipc/libuipc/conda/env.yaml
@@ -134,13 +135,15 @@ else
 
     current_dir=$(pwd)
 
-    if [ -d "Toolchain" ]; then
-        echo "Toolchain directory already exists. Skipping cloning vcpkg..."
-        mkdir ~/Toolchain
-        cd ~/Toolchain
+    if [ ! -d "$HOME/Toolchain/vcpkg" ]; then
+        echo "vcpkg does not exist. Cloning vcpkg..."
+        mkdir -p "$HOME/Toolchain"
+        cd "$HOME/Toolchain"
         git clone https://github.com/microsoft/vcpkg.git
         cd vcpkg
         ./bootstrap-vcpkg.sh -disableMetrics
+    else
+        echo "vcpkg already exists. Skipping clone..."
     fi
 
     export CMAKE_TOOLCHAIN_FILE="$HOME/Toolchain/vcpkg/scripts/buildsystems/vcpkg.cmake"
@@ -161,5 +164,7 @@ fi
 ${uv_exe} pip install transforms3d trimesh tetgen
 
 echo "Installation completed successfully!"
+echo "Running UniVTAC environment validation..."
+${python_exe} "${REPO_ROOT}/scripts/eval-env.py"
 echo "Trying to collect data for grasp classification demo."
 bash collect_data.sh grasp_classify demo 0

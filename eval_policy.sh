@@ -5,6 +5,6 @@ POLICY_CONIFG=${3}
 GPU=${4}
 
 export CUDA_VISIBLE_DEVICES=$GPU
-python scripts/eval_policy.py $TASK_NAME $TASK_CONFIG $POLICY_CONIFG
+python scripts/eval_policy.py $TASK_NAME $TASK_CONFIG $POLICY_CONIFG --headless
 
 # bash eval_policy.sh ACT/deploy_policy_insert_lean 0
