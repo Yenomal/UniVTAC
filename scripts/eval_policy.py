@@ -139,7 +139,11 @@ def eval_policy(
             task.mean_steps = task.cfg.step_lim
             policy.reset()
             while task.take_action_cnt < task.cfg.step_lim:
-                observation = task._get_observations()
+                needs_observation = getattr(policy, "needs_observation", None)
+                if callable(needs_observation) and not needs_observation(task):
+                    observation = None
+                else:
+                    observation = task.get_policy_observation()
                 policy.eval(task, observation)
                 if task.eval_success:
                     succ = True
@@ -203,10 +207,10 @@ def main():
     deploy_config['task_name'] = task_file_name
     deploy_config['task_config'] = task_config_file.stem
  
-    deploy_config['instuction_file'] = deploy_config.get('instuction_file', task_file_name)
-    if deploy_config['instuction_file'] is not None:
+    deploy_config['instruction_file'] = deploy_config.get('instruction_file', task_file_name)
+    if deploy_config['instruction_file'] is not None:
         instructions, _ = get_config(
-            deploy_config['instuction_file'], default_root=Path(__file__).parent.parent / 'instructions', type='json'
+            deploy_config['instruction_file'], default_root=Path(__file__).parent.parent / 'instructions', type='json'
         )
     else:
         instructions = {'seen': ['Empty'], 'unseen': ['Empty']}
@@ -221,8 +225,23 @@ def main():
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.obs_data_type = task_config.get("observations", {})
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
-    env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
+    env_cfg.video_frequency = deploy_config.get(
+        "video_frequency", task_config.get("video_frequency", env_cfg.video_frequency)
+    )
+    env_cfg.render_frequency = deploy_config.get(
+        "render_frequency", task_config.get("render_frequency", env_cfg.render_frequency)
+    )
     env_cfg.random_texture = task_config.get("random_texture", False)
+    if policy_name in {"openpi", "streaming_openpi"}:
+        env_cfg.obs_data_type = {
+            "camera": ["rgb"],
+            "embodiment": ["joint"],
+        }
+        if deploy_config.get("use_tactile", False):
+            env_cfg.obs_data_type["tactile"] = ["marker"]
+        env_cfg.tactile_sensor_type = deploy_config.get(
+            "tactile_sensor_type", task_config.get("sensor_type", env_cfg.tactile_sensor_type)
+        )
 
     env_cfg.scene.num_envs = 1
     env_cfg.sim.device = args_cli.device if args_cli.device is not None \

@@ -249,7 +249,14 @@ class BaseTask(UipcRLEnv):
         self.set_debug_vis(self.cfg.debug_vis)
     
     def load_robot_and_sensors(self, cfg:BaseTaskCfg):
-        data_type = ["camera_depth", "tactile_rgb", "marker_rgb", "marker_motion"]
+        requested_tactile = set(cfg.obs_data_type.get("tactile", ()))
+        data_type = []
+        if "rgb" in requested_tactile:
+            data_type.append("tactile_rgb")
+        if "rgb_marker" in requested_tactile or cfg.video_frequency > 0:
+            data_type.append("marker_rgb")
+        if "marker" in requested_tactile:
+            data_type.append("marker_motion")
         if cfg.tactile_sensor_type == 'gsmini':
             cfg.robot = create_franka_gsmini_gripper(data_type=data_type)
         elif cfg.tactile_sensor_type == 'gf225':
@@ -547,8 +554,7 @@ class BaseTask(UipcRLEnv):
         for _ in range(self.cfg.decimation):
             self.sim.step(render=False)
 
-        if render_freq or (self.mode == 'collect' and is_save and save_freq) or (is_save and video_freq) \
-            or (self.mode == 'eval' and not self.in_pre_move):
+        if render_freq or (self.mode == 'collect' and is_save and save_freq) or (is_save and video_freq):
             self._update_render()
 
         obs = None
@@ -629,6 +635,12 @@ class BaseTask(UipcRLEnv):
         if 'actor' in self.cfg.obs_data_type:
             obs['actor'] = self._actor_manager.get_observations()
         return obs
+
+    def get_policy_observation(self):
+        """Refresh sensors once and return the observation consumed by a policy request."""
+        if self.last_render != self.step_count:
+            self._update_render()
+        return self._get_observations()
     
     def clean_cache(self, mean_steps:float=0.0, result:str=None):
         self.mean_steps = mean_steps

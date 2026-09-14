@@ -73,7 +73,8 @@ def create_gelsight_mini_cfg(
         ),
         data_types=data_type
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 64
+    # The tactile checkpoint uses the native 9 x 7 GS Mini marker grid.
+    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 63
     sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
         with_shadow=False,
         tactile_img_res=resolution,

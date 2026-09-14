@@ -1,12 +1,25 @@
 policy_name: streaming_openpi
-host: 127.0.0.1
+host: 10.15.88.85
 fm_port: 8000
 vlm_port: 8001
 side_camera: head
 wrist_camera: wrist
-state_dim: 8
+state_dim: 9
 session_prefix: univtac
 num_steps: 10
-vlm_refresh_interval_actions: 10
+# Streaming model contract.
+horizon: 50
+streaming_chunk_size: 5
+# Refresh the VLM plan when horizon - watermark actions remain.
+watermark: 30
+# Enable the two tactile marker streams used by the tactile checkpoint.
+use_tactile: true
+marker_count: 63
+tactile_sensor_type: gsmini
+reconnect_attempts: 1
+video_frequency: 0
+render_frequency: 0
 # Omit for a checkpoint trained directly on UniVTAC Panda qpos actions.
-# action_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+# action_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+instruction_type: seen
+instruction_file: null

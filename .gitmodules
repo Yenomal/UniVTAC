@@ -1,0 +1,6 @@
+[submodule "third_party/openpi_dexhand"]
+	path = third_party/openpi_dexhand
+	url = https://github.com/LUhaotao/openpi_dexhand.git
+[submodule "third_party/Robot_Lab"]
+	path = third_party/Robot_Lab
+	url = https://github.com/YesAI-Manipulation/Robot_Lab.git

@@ -1,8 +1,16 @@
 policy_name: openpi
-host: 127.0.0.1
-port: 8000
+# host: 127.0.0.1
+host: 10.15.88.85
+port: 8020
 side_camera: head
 wrist_camera: wrist
-state_dim: 8
+state_dim: 9
+# Replan after this many executed actions.
+watermark: 30
+reconnect_attempts: 1
+video_frequency: 0
+render_frequency: 0
 # Omit for a checkpoint trained directly on UniVTAC Panda qpos actions.
-# action_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+# action_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+instruction_type: seen
+instruction_file: null

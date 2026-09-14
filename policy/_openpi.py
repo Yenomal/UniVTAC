@@ -14,7 +14,7 @@ def make_client(host: str, port: int) -> Any:
     try:
         from openpi_client.websocket_client_policy import WebsocketClientPolicy
     except ImportError as exc:
-        client_source = Path(__file__).resolve().parents[3] / "packages" / "openpi-client" / "src"
+        client_source = Path(__file__).resolve().parents[1] / "third_party" / "openpi_dexhand" / "packages" / "openpi-client" / "src"
         if not client_source.is_dir():
             raise ImportError(
                 "OpenPI client is unavailable. Install the openpi-client package in the UniVTAC environment."
@@ -31,6 +31,10 @@ def build_observation(
     side_camera: str,
     wrist_camera: str,
     state_dim: int,
+    include_tactile: bool = False,
+    left_tactile: str = "left_tactile",
+    right_tactile: str = "right_tactile",
+    marker_count: int | None = None,
 ) -> dict[str, Any]:
     if state_dim <= 0:
         raise ValueError("state_dim must be positive")
@@ -44,7 +48,23 @@ def build_observation(
         raise ValueError(f"UniVTAC observation is missing {exc.args[0]!r}") from exc
     if state.shape != (state_dim,):
         raise ValueError(f"UniVTAC state must have at least {state_dim} dimensions, got {state.shape}")
-    return {"images": images, "state": state, "prompt": prompt}
+    request = {"images": images, "state": state, "prompt": prompt}
+    if include_tactile:
+        try:
+            left_marker = _as_numpy(observation["tactile"][left_tactile]["marker"], np.float32)
+            right_marker = _as_numpy(observation["tactile"][right_tactile]["marker"], np.float32)
+        except KeyError as exc:
+            raise ValueError(f"UniVTAC tactile observation is missing {exc.args[0]!r}") from exc
+        _validate_marker(left_marker, "left_marker", marker_count)
+        _validate_marker(right_marker, "right_marker", marker_count)
+        if left_marker.shape != right_marker.shape:
+            raise ValueError(
+                "UniVTAC left and right tactile markers must have the same shape, "
+                f"got {left_marker.shape} and {right_marker.shape}"
+            )
+        request["left_marker"] = left_marker
+        request["right_marker"] = right_marker
+    return request
 
 
 def select_actions(
@@ -75,13 +95,47 @@ def select_actions(
     return actions
 
 
+def compress_qpos(actions: np.ndarray) -> np.ndarray:
+    """Convert UniVTAC's 9D arm+two-finger qpos to its 8D control qpos."""
+    actions = np.asarray(actions, dtype=np.float32)
+    if actions.ndim != 2 or actions.shape[1] != 9:
+        raise ValueError(f"UniVTAC model actions must have shape (T, 9), got {actions.shape}")
+    return actions[:, :8]
+
+
 def close_client(client: Any) -> None:
     websocket = getattr(client, "_ws", None)
     if websocket is not None:
         websocket.close()
 
 
+def is_connection_error(exc: BaseException) -> bool:
+    """Return whether an inference failure indicates a broken transport."""
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return True
+    return type(exc).__name__ in {
+        "ConnectionClosed",
+        "ConnectionClosedError",
+        "ConnectionClosedOK",
+    }
+
+
 def _as_numpy(value: Any, dtype: np.dtype) -> np.ndarray:
     if hasattr(value, "detach"):
         value = value.detach().cpu().numpy()
-    return np.ascontiguousarray(np.asarray(value, dtype=dtype))
+    array = np.asarray(value, dtype=dtype)
+    if not array.flags.c_contiguous or not array.flags.writeable:
+        array = np.array(array, dtype=dtype, copy=True, order="C")
+    return array
+
+
+def _validate_marker(marker: np.ndarray, name: str, marker_count: int | None) -> None:
+    if marker.ndim != 3 or marker.shape[0] != 2 or marker.shape[-1] != 2:
+        raise ValueError(f"UniVTAC {name} must have shape (2, N, 2), got {marker.shape}")
+    if marker_count is not None and marker.shape[1] != marker_count:
+        raise ValueError(
+            f"UniVTAC {name} must contain {marker_count} markers for this checkpoint, "
+            f"got {marker.shape[1]}"
+        )
+    if not np.isfinite(marker).all():
+        raise ValueError(f"UniVTAC {name} contains non-finite values")
