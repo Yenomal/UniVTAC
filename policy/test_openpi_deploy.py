@@ -88,10 +88,14 @@ def test_streaming_watermark_means_remaining_horizon():
     policy._refresh_after = 20
     policy._last_refresh_execution_id = 0
     policy._generation = 0
+    policy._latest_vlm_request = {"state": np.zeros(9, dtype=np.float32)}
     policy._action_buffer = np.zeros((5, 8), dtype=np.float32)
 
     assert not policy.needs_observation(_Task(take_action_cnt=19))
     assert policy.needs_observation(_Task(take_action_cnt=20))
+
+    policy._action_buffer = np.empty((0, 8), dtype=np.float32)
+    assert not policy.needs_observation(_Task(take_action_cnt=5))
 
 
 def test_streaming_validates_and_buffers_fm_chunk():
@@ -112,6 +116,17 @@ def test_streaming_validates_and_buffers_fm_chunk():
     policy._chunk_size = 5
     policy._last_refresh_execution_id = 0
     policy._generation = 0
+    policy._latest_vlm_request = streaming_deploy.build_observation(
+        _observation(),
+        "test task",
+        side_camera="head",
+        wrist_camera="wrist",
+        state_dim=9,
+        include_tactile=True,
+        left_tactile="left_tactile",
+        right_tactile="right_tactile",
+        marker_count=63,
+    )
     policy._action_buffer = np.empty((0, 8), dtype=np.float32)
     policy._metrics_lock = threading.Lock()
     policy._timing = {}
@@ -133,10 +148,12 @@ def test_streaming_validates_and_buffers_fm_chunk():
     policy._stream_infer = stream_infer
     task = _Task(take_action_cnt=5)
 
-    policy.eval(task, _observation())
+    assert not policy.needs_observation(task)
+    policy.eval(task, None)
 
     assert len(stream_calls) == 1
     assert len(policy._action_buffer) == 4
+    assert policy._latest_vlm_request["state"].shape == (9,)
 
 
 def test_openpi_skips_observation_while_sync_chunk_is_buffered(monkeypatch):

@@ -76,6 +76,7 @@ class Policy(BasePolicy):
         self._refresh_thread.start()
         self._session_id = ""
         self._last_refresh_execution_id = None
+        self._latest_vlm_request: dict[str, Any] | None = None
         self._action_buffer = np.empty((0, 8), dtype=np.float32)
 
     def reset(self):
@@ -87,6 +88,7 @@ class Policy(BasePolicy):
         self._clear_refresh_queue()
         self._session_id = f"{self._session_prefix}-{uuid.uuid4()}"
         self._last_refresh_execution_id = None
+        self._latest_vlm_request = None
         self._action_buffer = np.empty((0, 8), dtype=np.float32)
         with self._refresh_rpc_lock:
             response = self._timed_infer("fm", {
@@ -100,7 +102,7 @@ class Policy(BasePolicy):
     def needs_observation(self, task) -> bool:
         with self._cache_lock:
             cache_missing = self._cache_version is None
-        if cache_missing or self._action_buffer is None or len(self._action_buffer) == 0:
+        if cache_missing or self._latest_vlm_request is None:
             return True
         if self._last_refresh_execution_id is None:
             return True
@@ -122,6 +124,11 @@ class Policy(BasePolicy):
                 right_tactile=self._right_tactile,
                 marker_count=self._marker_count,
             )
+            self._latest_vlm_request = request
+        elif self._latest_vlm_request is not None:
+            # FM reuses the latest visual/tactile condition. The low-dimensional
+            # state is updated after every executed qpos action below.
+            request = self._latest_vlm_request
         with self._cache_lock:
             cache_version = self._cache_version
             generation = self._generation
@@ -158,7 +165,23 @@ class Policy(BasePolicy):
         action = self._action_buffer[0]
         self._action_buffer = self._action_buffer[1:]
         task.take_action(torch.as_tensor(action, device=task.device), action_type="qpos")
+        self._update_cached_state(action)
         task.metadata["policy_timing"] = self.timing_snapshot()
+
+    def _update_cached_state(self, action: np.ndarray) -> None:
+        """Track the commanded UniVTAC qpos without requesting a rendered frame."""
+        if self._latest_vlm_request is None:
+            return
+        action = np.asarray(action, dtype=np.float32).reshape(-1)
+        if self._state_dim == 9 and action.shape == (8,):
+            state = np.concatenate([action, action[-1:]])
+        elif action.shape == (self._state_dim,):
+            state = action.copy()
+        else:
+            return
+        # Replace the top-level mapping so a request already queued for the
+        # asynchronous VLM worker remains an immutable observation snapshot.
+        self._latest_vlm_request = {**self._latest_vlm_request, "state": state}
 
     def close(self):
         self._stop_event.set()
