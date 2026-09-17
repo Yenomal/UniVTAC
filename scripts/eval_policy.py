@@ -54,6 +54,12 @@ parser.add_argument(
     default=100
 )
 parser.add_argument(
+    "--run_name",
+    type=str,
+    default=None,
+    help="Evaluation result directory name. Defaults to the start timestamp."
+)
+parser.add_argument(
     "--print_only",
     action='store_true',
 )
@@ -218,10 +224,10 @@ def main():
     task_module = importlib.import_module(f"envs.{task_file_name}")
     policy_module = importlib.import_module(f"policy.{policy_name}")
     
-    curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
+    run_name = args_cli.run_name or time.strftime(r'%Y-%m-%d_%H:%M:%S')
 
     env_cfg:BaseTaskCfg = task_module.TaskCfg()
-    env_cfg.save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem / curr_time
+    env_cfg.save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem / run_name
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.obs_data_type = task_config.get("observations", {})
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
