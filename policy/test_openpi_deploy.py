@@ -23,8 +23,8 @@ class _Task:
         self.take_action_cnt += 1
 
 
-def _observation():
-    markers = np.zeros((2, 63, 2), dtype=np.float32)
+def _observation(marker_value: float = 0.0):
+    markers = np.full((2, 63, 2), marker_value, dtype=np.float32)
     return {
         "observation": {
             "head": {"rgb": np.zeros((2, 3, 3), dtype=np.uint8)},
@@ -103,13 +103,24 @@ def test_streaming_watermark_means_remaining_horizon():
     assert not policy.needs_observation(_Task(take_action_cnt=5))
 
 
+def test_streaming_tactile_history_requests_observation_every_action():
+    policy = object.__new__(streaming_deploy.Policy)
+    policy._use_tactile = True
+    policy._cache_version = "cache-1"
+    policy._latest_vlm_request = {"state": np.zeros(9, dtype=np.float32)}
+    policy._last_refresh_execution_id = 0
+    policy._refresh_after = 20
+    policy._cache_lock = threading.Lock()
+    assert policy.needs_observation(_Task(take_action_cnt=1))
+
+
 def test_streaming_validates_and_buffers_fm_chunk():
     policy = object.__new__(streaming_deploy.Policy)
     policy._side_camera = "head"
     policy._wrist_camera = "wrist"
     policy._state_dim = 9
     policy._action_indices = None
-    policy._use_tactile = True
+    policy._use_tactile = False
     policy._left_tactile = "left_tactile"
     policy._right_tactile = "right_tactile"
     policy._marker_count = 63
@@ -246,6 +257,94 @@ def test_streaming_initialises_tactile_cache_and_executes_one_fm_chunk(monkeypat
     finally:
         policy.close()
 
+
+def test_streaming_sends_recent_tactile_history_to_fm(monkeypatch):
+    class FmClient:
+        def __init__(self):
+            self.stream_requests = []
+
+        def infer(self, request):
+            if request["op"] == "reset_stream":
+                return {"prefix_cache_cleared": True}
+            if request["op"] == "stream_infer":
+                self.stream_requests.append(request)
+                return {
+                    "actions": np.zeros((5, 9), dtype=np.float32),
+                    "streaming": {
+                        "session_id": request["session_id"],
+                        "execution_id": request["executed_action_id"],
+                        "cache_version": "model:1",
+                        "action_count": 5,
+                    },
+                }
+            raise AssertionError(request)
+
+    class RefreshClient:
+        def infer(self, request):
+            return {
+                "cache_version": request["cache_version"],
+                "active_cache_version": request["cache_version"],
+            }
+
+    class VlmClient:
+        def infer(self, request):
+            return {"cache_id": 1, "cache_version": "model:1"}
+
+    fm = FmClient()
+    clients = iter((fm, RefreshClient(), VlmClient()))
+    monkeypatch.setattr(streaming_deploy, "make_client", lambda host, port: next(clients))
+    policy = streaming_deploy.Policy(
+        {
+            "state_dim": 9,
+            "horizon": 50,
+            "watermark": 30,
+            "streaming_chunk_size": 5,
+            "use_tactile": True,
+            "marker_count": 63,
+            "tactile_history_size": 3,
+            "tactile_history_enabled": True,
+        }
+    )
+    task = _Task()
+    try:
+        policy.reset()
+        for value in range(1, 7):
+            policy.eval(task, _observation(float(value)))
+
+        history = fm.stream_requests[-1]["observation"]["left_marker"]
+        assert history.shape == (3, 2, 63, 2)
+        np.testing.assert_array_equal(history[:, 0, 0, 0], [4.0, 5.0, 6.0])
+    finally:
+        policy.close()
+
+
+def test_streaming_tactile_history_disabled_sends_latest_frame(monkeypatch):
+    class FmClient:
+        def __init__(self):
+            self.stream_requests = []
+        def infer(self, request):
+            if request["op"] == "reset_stream": return {"prefix_cache_cleared": True}
+            if request["op"] == "stream_infer":
+                self.stream_requests.append(request)
+                return {"actions": np.zeros((5, 9), dtype=np.float32), "streaming": {"session_id": request["session_id"], "execution_id": request["executed_action_id"], "cache_version": "model:1", "action_count": 5}}
+            raise AssertionError(request)
+    class RefreshClient:
+        def infer(self, request): return {"cache_version": request["cache_version"], "active_cache_version": request["cache_version"]}
+    class VlmClient:
+        def infer(self, request): return {"cache_id": 1, "cache_version": "model:1"}
+    fm = FmClient()
+    clients = iter((fm, RefreshClient(), VlmClient()))
+    monkeypatch.setattr(streaming_deploy, "make_client", lambda host, port: next(clients))
+    policy = streaming_deploy.Policy({"state_dim": 9, "horizon": 50, "watermark": 30, "streaming_chunk_size": 5, "use_tactile": True, "marker_count": 63, "tactile_history_size": 3, "tactile_history_enabled": False})
+    task = _Task()
+    try:
+        policy.reset()
+        for value in range(1, 7): policy.eval(task, _observation(float(value)))
+        latest = fm.stream_requests[-1]["observation"]["left_marker"]
+        assert latest.shape == (2, 63, 2)
+        np.testing.assert_array_equal(latest[:, 0, 0], [6.0, 6.0])
+    finally:
+        policy.close()
 
 def test_sync_openpi_reconnects_and_retries_the_same_request(monkeypatch):
     class BrokenClient:

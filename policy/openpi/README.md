@@ -10,6 +10,8 @@
 
 `openpi` 连接普通 OpenPI 服务端。`streaming_openpi` 连接通过 `scripts/serve_policy.py --multi-process` 启动的服务，FM 使用 `fm_port`，VLM 使用 `vlm_port`。
 
+Streaming tactile checkpoint 可设置 `tactile_history_enabled` 和 `tactile_history_size`。client 每个 action 都采集一帧 marker；开关打开时，FM 按“最远到最近”发送固定长度 `(N,2,63,2)` 历史，历史不足时重复最早一帧填充。开关关闭时仍保持相同采样频率，但 FM 只收到最近一帧 `(2,63,2)`。
+
 ```bash
 bash eval_policy.sh lift_bottle demo openpi/deploy 0
 bash eval_policy.sh lift_bottle demo streaming_openpi/deploy 0

@@ -103,6 +103,28 @@ def compress_qpos(actions: np.ndarray) -> np.ndarray:
     return actions[:, :8]
 
 
+def stack_tactile_history(
+    history: Sequence[Any],
+    *,
+    history_size: int,
+    marker_count: int | None = None,
+) -> np.ndarray:
+    """Stack tactile marker frames oldest-to-newest with stable length."""
+    if history_size <= 0:
+        raise ValueError("history_size must be positive")
+    if not history:
+        raise ValueError("tactile history must contain at least one frame")
+    frames = []
+    for frame in history:
+        array = _as_numpy(frame, np.float32)
+        _validate_marker(array, "tactile_marker", marker_count)
+        frames.append(array)
+    frames = frames[-history_size:]
+    if len(frames) < history_size:
+        frames = [frames[0]] * (history_size - len(frames)) + frames
+    return np.stack(frames, axis=0)
+
+
 def close_client(client: Any) -> None:
     websocket = getattr(client, "_ws", None)
     if websocket is not None:

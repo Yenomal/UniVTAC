@@ -15,6 +15,9 @@ watermark: 45
 # Enable the two tactile marker streams used by the tactile checkpoint.
 use_tactile: true
 marker_count: 63
+tactile_history_size: 10
+# If true, FM receives (N, 2, 63, 2); if false, it receives the latest (2, 63, 2).
+tactile_history_enabled: true
 tactile_sensor_type: gsmini
 reconnect_attempts: 1
 # Omit for a checkpoint trained directly on UniVTAC Panda qpos actions.

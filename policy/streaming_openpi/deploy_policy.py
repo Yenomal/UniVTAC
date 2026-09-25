@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from collections import deque
 import logging
 import queue
 import threading
@@ -18,6 +19,7 @@ from policy._openpi import compress_qpos
 from policy._openpi import is_connection_error
 from policy._openpi import make_client
 from policy._openpi import select_actions
+from policy._openpi import stack_tactile_history
 import torch
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ class Policy(BasePolicy):
         self._right_tactile = args.get("right_tactile", "right_tactile")
         marker_count = args.get("marker_count")
         self._marker_count = int(marker_count) if marker_count is not None else None
+        self._tactile_history_size = int(args.get("tactile_history_size", 1))
+        self._tactile_history_enabled = bool(args.get("tactile_history_enabled", False))
         self._session_prefix = args.get("session_prefix", "univtac")
         self._num_steps = int(args.get("num_steps", 10))
         self._horizon = int(args.get("horizon", 50))
@@ -62,6 +66,8 @@ class Policy(BasePolicy):
             raise ValueError("reconnect_attempts must be non-negative")
         if self._marker_count is not None and self._marker_count <= 0:
             raise ValueError("marker_count must be positive")
+        if self._tactile_history_size <= 0:
+            raise ValueError("tactile_history_size must be positive")
         self._refresh_after = self._horizon - self._watermark
 
         self._cache_version: str | None = None
@@ -77,6 +83,8 @@ class Policy(BasePolicy):
         self._session_id = ""
         self._last_refresh_execution_id = None
         self._latest_vlm_request: dict[str, Any] | None = None
+        self._left_marker_history: deque[np.ndarray] = deque(maxlen=self._tactile_history_size)
+        self._right_marker_history: deque[np.ndarray] = deque(maxlen=self._tactile_history_size)
         self._action_buffer = np.empty((0, 8), dtype=np.float32)
 
     def reset(self):
@@ -89,6 +97,8 @@ class Policy(BasePolicy):
         self._session_id = f"{self._session_prefix}-{uuid.uuid4()}"
         self._last_refresh_execution_id = None
         self._latest_vlm_request = None
+        self._left_marker_history.clear()
+        self._right_marker_history.clear()
         self._action_buffer = np.empty((0, 8), dtype=np.float32)
         with self._refresh_rpc_lock:
             response = self._timed_infer("fm", {
@@ -100,6 +110,8 @@ class Policy(BasePolicy):
             raise RuntimeError("FM did not clear its prefix and streaming caches")
 
     def needs_observation(self, task) -> bool:
+        if getattr(self, "_use_tactile", False):
+            return True
         with self._cache_lock:
             cache_missing = self._cache_version is None
         if cache_missing or self._latest_vlm_request is None:
@@ -124,6 +136,19 @@ class Policy(BasePolicy):
                 right_tactile=self._right_tactile,
                 marker_count=self._marker_count,
             )
+            self._left_marker_history.append(request["left_marker"])
+            self._right_marker_history.append(request["right_marker"])
+            if self._tactile_history_enabled:
+                request["left_marker"] = stack_tactile_history(
+                    self._left_marker_history,
+                    history_size=self._tactile_history_size,
+                    marker_count=self._marker_count,
+                )
+                request["right_marker"] = stack_tactile_history(
+                    self._right_marker_history,
+                    history_size=self._tactile_history_size,
+                    marker_count=self._marker_count,
+                )
             self._latest_vlm_request = request
         elif self._latest_vlm_request is not None:
             # FM reuses the latest visual/tactile condition. The low-dimensional
