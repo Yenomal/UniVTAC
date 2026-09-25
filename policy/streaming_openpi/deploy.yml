@@ -11,7 +11,7 @@ num_steps: 10
 horizon: 50
 streaming_chunk_size: 5
 # Refresh the VLM plan when horizon - watermark actions remain.
-watermark: 30
+watermark: 45
 # Enable the two tactile marker streams used by the tactile checkpoint.
 use_tactile: true
 marker_count: 63
