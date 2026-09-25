@@ -42,9 +42,10 @@ def test_openpi_watermark_controls_replanning(monkeypatch):
     class Client:
         def __init__(self):
             self.calls = 0
+            self.requests = []
 
         def infer(self, request):
-            del request
+            self.requests.append(request)
             self.calls += 1
             return {
                 "actions": np.arange(27, dtype=np.float32).reshape(3, 9)
@@ -53,7 +54,9 @@ def test_openpi_watermark_controls_replanning(monkeypatch):
 
     client = Client()
     monkeypatch.setattr(openpi_deploy, "make_client", lambda host, port: client)
-    policy = openpi_deploy.Policy({"watermark": 2, "state_dim": 9})
+    policy = openpi_deploy.Policy(
+        {"watermark": 2, "state_dim": 9, "use_tactile": True, "marker_count": 63}
+    )
     task = _Task()
 
     policy.eval(task, _observation())
@@ -61,6 +64,8 @@ def test_openpi_watermark_controls_replanning(monkeypatch):
     policy.eval(task, _observation())
 
     assert client.calls == 2
+    assert client.requests[0]["left_marker"].shape == (2, 63, 2)
+    assert client.requests[0]["right_marker"].shape == (2, 63, 2)
     torch.testing.assert_close(task.actions[0], torch.arange(8, dtype=torch.float32))
     torch.testing.assert_close(task.actions[1], torch.arange(9, 17, dtype=torch.float32))
     torch.testing.assert_close(task.actions[2], torch.arange(100, 108, dtype=torch.float32))

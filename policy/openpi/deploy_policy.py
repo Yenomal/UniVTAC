@@ -30,11 +30,18 @@ class Policy(BasePolicy):
         self._wrist_camera = args.get("wrist_camera", "wrist")
         self._state_dim = int(args.get("state_dim", 8))
         self._action_indices = args.get("action_indices")
+        self._use_tactile = bool(args.get("use_tactile", False))
+        self._left_tactile = args.get("left_tactile", "left_tactile")
+        self._right_tactile = args.get("right_tactile", "right_tactile")
+        marker_count = args.get("marker_count")
+        self._marker_count = int(marker_count) if marker_count is not None else None
         self._watermark = int(args.get("watermark", 1))
         if self._watermark <= 0:
             raise ValueError("watermark must be positive")
         if self._reconnect_attempts < 0:
             raise ValueError("reconnect_attempts must be non-negative")
+        if self._marker_count is not None and self._marker_count <= 0:
+            raise ValueError("marker_count must be positive")
         self._action_buffer = None
         self._timing = {"count": 0, "last_ms": 0.0, "mean_ms": 0.0, "max_ms": 0.0}
 
@@ -56,6 +63,10 @@ class Policy(BasePolicy):
                 side_camera=self._side_camera,
                 wrist_camera=self._wrist_camera,
                 state_dim=self._state_dim,
+                include_tactile=self._use_tactile,
+                left_tactile=self._left_tactile,
+                right_tactile=self._right_tactile,
+                marker_count=self._marker_count,
             )
             response = self._infer(request)
             actions = select_actions(
