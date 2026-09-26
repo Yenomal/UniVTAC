@@ -12,6 +12,7 @@
 /data/*
 !/data/download.sh
 /eval_result
+/eval_result_old
 /policy/**/data*/**
 /policy/**/outputs*/**
 /policy/**/checkpoints*/**
