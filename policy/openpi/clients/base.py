@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from typing import Any, Protocol
+
+
+class OpenPIBackend(Protocol):
+    def reset(self) -> None: ...
+
+    def needs_observation(self, task: Any) -> bool: ...
+
+    def eval(self, task: Any, observation: Any) -> None: ...
+
+    def close(self) -> None: ...

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from policy.openpi import deploy_policy as openpi_deploy
+from policy.single_openpi import deploy_policy as openpi_deploy
 from policy.streaming_openpi import deploy_policy as streaming_deploy
 
 

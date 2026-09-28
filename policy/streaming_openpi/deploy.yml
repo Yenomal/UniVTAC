@@ -1,7 +1,7 @@
 policy_name: streaming_openpi
 host: 10.15.88.85
-fm_port: 8000
-vlm_port: 8001
+fm_port: 8100
+vlm_port: 8101
 side_camera: head
 wrist_camera: wrist
 state_dim: 9

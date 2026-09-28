@@ -1,0 +1,14 @@
+policy_name: openpi
+client_type: single
+host: 10.15.88.85
+port: 8008
+side_camera: head
+wrist_camera: wrist
+state_dim: 9
+watermark: 30
+reconnect_attempts: 1
+use_tactile: true
+marker_count: 63
+tactile_sensor_type: gsmini
+instruction_type: seen
+instruction_file: null

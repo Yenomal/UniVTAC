@@ -238,7 +238,7 @@ def main():
         "render_frequency", task_config.get("render_frequency", env_cfg.render_frequency)
     )
     env_cfg.random_texture = task_config.get("random_texture", False)
-    if policy_name in {"openpi", "streaming_openpi"}:
+    if policy_name in {"openpi", "single_openpi", "streaming_openpi"}:
         env_cfg.obs_data_type = {
             "camera": ["rgb"],
             "embodiment": ["joint"],
