@@ -302,7 +302,6 @@ def test_streaming_sends_recent_tactile_history_to_fm(monkeypatch):
             "use_tactile": True,
             "marker_count": 63,
             "tactile_history_size": 3,
-            "tactile_history_enabled": True,
         }
     )
     task = _Task()
@@ -314,6 +313,65 @@ def test_streaming_sends_recent_tactile_history_to_fm(monkeypatch):
         history = fm.stream_requests[-1]["observation"]["left_marker"]
         assert history.shape == (3, 2, 63, 2)
         np.testing.assert_array_equal(history[:, 0, 0, 0], [4.0, 5.0, 6.0])
+    finally:
+        policy.close()
+
+
+def test_streaming_sends_recent_state_history_to_fm(monkeypatch):
+    class FmClient:
+        def __init__(self):
+            self.stream_requests = []
+
+        def infer(self, request):
+            if request["op"] == "reset_stream":
+                return {"prefix_cache_cleared": True}
+            if request["op"] == "stream_infer":
+                self.stream_requests.append(request)
+                return {
+                    "actions": np.zeros((5, 9), dtype=np.float32),
+                    "streaming": {
+                        "session_id": request["session_id"],
+                        "execution_id": request["executed_action_id"],
+                        "cache_version": "model:1",
+                        "action_count": 5,
+                    },
+                }
+            raise AssertionError(request)
+
+    class RefreshClient:
+        def infer(self, request):
+            return {
+                "cache_version": request["cache_version"],
+                "active_cache_version": request["cache_version"],
+            }
+
+    class VlmClient:
+        def infer(self, request):
+            return {"cache_id": 1, "cache_version": "model:1"}
+
+    fm = FmClient()
+    clients = iter((fm, RefreshClient(), VlmClient()))
+    monkeypatch.setattr(streaming_deploy, "make_client", lambda host, port: next(clients))
+    policy = streaming_deploy.Policy(
+        {
+            "state_dim": 9,
+            "horizon": 50,
+            "watermark": 30,
+            "streaming_chunk_size": 5,
+            "history_size": 3,
+        }
+    )
+    task = _Task()
+    try:
+        policy.reset()
+        for value in range(1, 7):
+            observation = _observation()
+            observation["embodiment"]["joint"] = np.full(9, value, dtype=np.float32)
+            policy.eval(task, observation)
+
+        history = fm.stream_requests[-1]["observation"]["state"]
+        assert history.shape == (3, 9)
+        np.testing.assert_array_equal(history[:, 0], [5.0, 0.0, 6.0])
     finally:
         policy.close()
 

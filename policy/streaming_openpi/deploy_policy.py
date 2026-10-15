@@ -19,6 +19,7 @@ from policy._openpi import compress_qpos
 from policy._openpi import is_connection_error
 from policy._openpi import make_client
 from policy._openpi import select_actions
+from policy._openpi import stack_state_history
 from policy._openpi import stack_tactile_history
 import torch
 
@@ -46,8 +47,11 @@ class Policy(BasePolicy):
         self._right_tactile = args.get("right_tactile", "right_tactile")
         marker_count = args.get("marker_count")
         self._marker_count = int(marker_count) if marker_count is not None else None
-        self._tactile_history_size = int(args.get("tactile_history_size", 1))
-        self._tactile_history_enabled = bool(args.get("tactile_history_enabled", False))
+        history_size = args.get("history_size", args.get("tactile_history_size", 1))
+        self._history_size = int(history_size)
+        self._tactile_history_enabled = bool(
+            args.get("tactile_history_enabled", self._history_size > 1)
+        )
         self._session_prefix = args.get("session_prefix", "univtac")
         self._num_steps = int(args.get("num_steps", 10))
         self._horizon = int(args.get("horizon", 50))
@@ -66,8 +70,8 @@ class Policy(BasePolicy):
             raise ValueError("reconnect_attempts must be non-negative")
         if self._marker_count is not None and self._marker_count <= 0:
             raise ValueError("marker_count must be positive")
-        if self._tactile_history_size <= 0:
-            raise ValueError("tactile_history_size must be positive")
+        if self._history_size <= 0:
+            raise ValueError("history_size must be positive")
         self._refresh_after = self._horizon - self._watermark
 
         self._cache_version: str | None = None
@@ -83,8 +87,9 @@ class Policy(BasePolicy):
         self._session_id = ""
         self._last_refresh_execution_id = None
         self._latest_vlm_request: dict[str, Any] | None = None
-        self._left_marker_history: deque[np.ndarray] = deque(maxlen=self._tactile_history_size)
-        self._right_marker_history: deque[np.ndarray] = deque(maxlen=self._tactile_history_size)
+        self._state_history: deque[np.ndarray] = deque(maxlen=self._history_size)
+        self._left_marker_history: deque[np.ndarray] = deque(maxlen=self._history_size)
+        self._right_marker_history: deque[np.ndarray] = deque(maxlen=self._history_size)
         self._action_buffer = np.empty((0, 8), dtype=np.float32)
 
     def reset(self):
@@ -97,6 +102,7 @@ class Policy(BasePolicy):
         self._session_id = f"{self._session_prefix}-{uuid.uuid4()}"
         self._last_refresh_execution_id = None
         self._latest_vlm_request = None
+        self._state_history.clear()
         self._left_marker_history.clear()
         self._right_marker_history.clear()
         self._action_buffer = np.empty((0, 8), dtype=np.float32)
@@ -136,17 +142,24 @@ class Policy(BasePolicy):
                 right_tactile=self._right_tactile,
                 marker_count=self._marker_count,
             )
-            self._left_marker_history.append(request["left_marker"])
-            self._right_marker_history.append(request["right_marker"])
-            if self._tactile_history_enabled:
+            self._state_history.append(request["state"])
+            if self._history_size > 1:
+                request["state"] = stack_state_history(
+                    self._state_history,
+                    history_size=self._history_size,
+                )
+            if self._use_tactile:
+                self._left_marker_history.append(request["left_marker"])
+                self._right_marker_history.append(request["right_marker"])
+            if self._use_tactile and self._tactile_history_enabled:
                 request["left_marker"] = stack_tactile_history(
                     self._left_marker_history,
-                    history_size=self._tactile_history_size,
+                    history_size=self._history_size,
                     marker_count=self._marker_count,
                 )
                 request["right_marker"] = stack_tactile_history(
                     self._right_marker_history,
-                    history_size=self._tactile_history_size,
+                    history_size=self._history_size,
                     marker_count=self._marker_count,
                 )
             self._latest_vlm_request = request
@@ -206,6 +219,14 @@ class Policy(BasePolicy):
             return
         # Replace the top-level mapping so a request already queued for the
         # asynchronous VLM worker remains an immutable observation snapshot.
+        state_history = getattr(self, "_state_history", None)
+        history_size = int(getattr(self, "_history_size", 1))
+        if state_history is None:
+            state_history = deque(maxlen=history_size)
+            self._state_history = state_history
+        state_history.append(state)
+        if history_size > 1:
+            state = stack_state_history(state_history, history_size=history_size)
         self._latest_vlm_request = {**self._latest_vlm_request, "state": state}
 
     def close(self):

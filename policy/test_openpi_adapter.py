@@ -2,6 +2,7 @@ import numpy as np
 from policy._openpi import build_observation
 from policy._openpi import compress_qpos
 from policy._openpi import select_actions
+from policy._openpi import stack_state_history
 from policy._openpi import stack_tactile_history
 import pytest
 
@@ -83,6 +84,24 @@ def test_stack_tactile_history_keeps_only_recent_frames():
     frames = [np.full((2, 63, 2), value, dtype=np.float32) for value in (1, 2, 3)]
     history = stack_tactile_history(frames, history_size=2, marker_count=63)
     np.testing.assert_array_equal(history[:, 0, 0, 0], [2.0, 3.0])
+
+
+def test_stack_state_history_is_oldest_to_newest_and_pads_oldest():
+    first = np.asarray([1.0, 2.0], dtype=np.float32)
+    second = np.asarray([3.0, 4.0], dtype=np.float32)
+
+    history = stack_state_history([first, second], history_size=4)
+
+    assert history.shape == (4, 2)
+    np.testing.assert_array_equal(history, [[1, 2], [1, 2], [1, 2], [3, 4]])
+
+
+def test_stack_state_history_keeps_only_recent_states():
+    states = [np.asarray([value], dtype=np.float32) for value in (1, 2, 3)]
+
+    history = stack_state_history(states, history_size=2)
+
+    np.testing.assert_array_equal(history[:, 0], [2.0, 3.0])
 
 
 def test_compress_qpos_uses_first_finger_dimension():

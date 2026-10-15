@@ -125,6 +125,31 @@ def stack_tactile_history(
     return np.stack(frames, axis=0)
 
 
+def stack_state_history(history: Sequence[Any], *, history_size: int) -> np.ndarray:
+    """Stack low-dimensional state frames oldest-to-newest with stable length."""
+    if history_size <= 0:
+        raise ValueError("history_size must be positive")
+    if not history:
+        raise ValueError("state history must contain at least one frame")
+    frames = []
+    state_shape = None
+    for frame in history:
+        array = _as_numpy(frame, np.float32).reshape(-1)
+        if array.size == 0:
+            raise ValueError("state history frames must not be empty")
+        if state_shape is None:
+            state_shape = array.shape
+        elif array.shape != state_shape:
+            raise ValueError("state history frames must have the same shape")
+        if not np.isfinite(array).all():
+            raise ValueError("state history contains non-finite values")
+        frames.append(array)
+    frames = frames[-history_size:]
+    if len(frames) < history_size:
+        frames = [frames[0]] * (history_size - len(frames)) + frames
+    return np.stack(frames, axis=0)
+
+
 def close_client(client: Any) -> None:
     websocket = getattr(client, "_ws", None)
     if websocket is not None:

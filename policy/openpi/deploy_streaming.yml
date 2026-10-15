@@ -1,8 +1,8 @@
 policy_name: openpi
 client_type: streaming
 host: 10.15.88.85
-fm_port: 8100
-vlm_port: 8101
+fm_port: 8000
+vlm_port: 8001
 side_camera: head
 wrist_camera: wrist
 state_dim: 9
@@ -10,10 +10,10 @@ session_prefix: univtac
 num_steps: 10
 horizon: 50
 streaming_chunk_size: 5
-watermark: 45
+watermark: 30
 use_tactile: true
 marker_count: 63
-tactile_history_size: 10
+history_size: 10
 tactile_history_enabled: true
 tactile_sensor_type: gsmini
 reconnect_attempts: 1
