@@ -9,8 +9,8 @@ state_dim: 9
 session_prefix: univtac
 num_steps: 10
 horizon: 50
-streaming_chunk_size: 5
-watermark: 30
+streaming_chunk_size: 1
+watermark: 40
 use_tactile: true
 marker_count: 63
 history_size: 10

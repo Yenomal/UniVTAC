@@ -144,23 +144,3 @@ CUDA_VISIBLE_DEVICES=0 python scripts/eval_policy.py \
 | `observations.tactile` | `rgb`、`rgb_marker`、`marker`、`depth`、`pose` 的组合 | `tactile: ['rgb', 'depth']` |
 | `observations.embodiment` | `joint`、`ee` 的组合 | `embodiment: ['joint', 'ee']` |
 | `observations.actor` | `true`、`false` | `actor: false` |
-
-## pi-r2-UniVTAC 运行
-```bash
-## server，需要在pi-r2-GR00T下面
-.venv/bin/python gr00t/eval/run_gr00t_server.py \
-  --model-path ckpt/GR00T-N1.7-3B \
-  --embodiment-tag OXE_DROID_RELATIVE_EEF_RELATIVE_JOINT \
-  --device cuda:0 \
-  --decoupled \
-  --host 127.0.0.1 \
-  --port 5555
-# server这里需要cosmos的权重，代码使用的hf_home导入，需要export HF_HOME=/root/workspace/pi-r2-GR00T/.hf配合一下
-
-## client，需要在UniVTAC下面
-bash eval_policy.sh lift_bottle gr00t_rgb GR00T/deploy 0
-
-## debug
-# python -m debugpy --listen 5678 --wait-for-client python脚本
-
-```
