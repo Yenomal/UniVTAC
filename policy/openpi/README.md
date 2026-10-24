@@ -12,4 +12,4 @@ bash eval_policy.sh pull_out_key openpi openpi/deploy_runtime 0
 
 single 配置使用 `port`。streaming 配置使用 `fm_port`、`vlm_port`、`horizon` 和 `streaming_chunk_size`。两种模式均可设置 `use_tactile`、`marker_count` 和 `tactile_sensor_type`。
 
-`runtime_streaming` 配置连接 `serve_runtime.py` 暴露的单一端口。client 每个控制周期上传当前 observation 并同步等待单个 action；VLM prefix 刷新、KV cache、streaming chunk action queue 和执行计数由 server Runtime 管理。client 不组装历史窗口，也不发送 cache/version/execution 调度字段。`reset_stream` 仅在 episode 开始时发送。
+`runtime` 配置连接 `serve_runtime.py` 暴露的单一端口。client 每个控制周期上传当前 observation 并同步等待单个 action；Runtime 内部如何实现 prefix、缓存或动作队列属于 server 细节，client 不携带 streaming 语义，也不发送 cache/version/execution 调度字段。`reset` 仅在 episode 开始时发送。连接异常时 client 按 `reconnect_attempts` 重建 public WebSocket，并在新连接上重新初始化 Runtime session。

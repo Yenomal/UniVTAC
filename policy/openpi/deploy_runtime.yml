@@ -1,5 +1,5 @@
 policy_name: openpi
-client_type: runtime_streaming
+client_type: runtime
 host: 10.15.88.85
 port: 8000
 side_camera: head
