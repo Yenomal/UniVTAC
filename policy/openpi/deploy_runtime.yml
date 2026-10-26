@@ -1,7 +1,7 @@
 policy_name: openpi
 client_type: runtime
 host: 10.15.88.85
-port: 8000
+port: 8008
 side_camera: head
 wrist_camera: wrist
 state_dim: 9

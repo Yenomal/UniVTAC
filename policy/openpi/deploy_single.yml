@@ -5,7 +5,7 @@ port: 8008
 side_camera: head
 wrist_camera: wrist
 state_dim: 9
-watermark: 30
+watermark: 45
 reconnect_attempts: 1
 use_tactile: true
 marker_count: 63
