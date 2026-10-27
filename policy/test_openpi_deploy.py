@@ -6,6 +6,7 @@ import torch
 
 from policy.single_openpi import deploy_policy as openpi_deploy
 from policy.streaming_openpi import deploy_policy as streaming_deploy
+from policy.openpi.clients import runtime as runtime_client
 
 
 class _Task:
@@ -381,7 +382,8 @@ def test_streaming_tactile_history_disabled_sends_latest_frame(monkeypatch):
         def __init__(self):
             self.stream_requests = []
         def infer(self, request):
-            if request["op"] == "reset_stream": return {"prefix_cache_cleared": True}
+            if request["op"] == "reset_stream":
+                return {"prefix_cache_cleared": True}
             if request["op"] == "stream_infer":
                 self.stream_requests.append(request)
                 return {"actions": np.zeros((5, 9), dtype=np.float32), "streaming": {"session_id": request["session_id"], "execution_id": request["executed_action_id"], "cache_version": "model:1", "action_count": 5}}
@@ -397,7 +399,8 @@ def test_streaming_tactile_history_disabled_sends_latest_frame(monkeypatch):
     task = _Task()
     try:
         policy.reset()
-        for value in range(1, 7): policy.eval(task, _observation(float(value)))
+        for value in range(1, 7):
+            policy.eval(task, _observation(float(value)))
         latest = fm.stream_requests[-1]["observation"]["left_marker"]
         assert latest.shape == (2, 63, 2)
         np.testing.assert_array_equal(latest[:, 0, 0], [6.0, 6.0])
@@ -430,3 +433,48 @@ def test_sync_openpi_reconnects_and_retries_the_same_request(monkeypatch):
 
     assert len(healthy.requests) == 1
     assert len(task.actions) == 1
+
+
+def test_runtime_reconnect_replays_same_action_without_reset(monkeypatch):
+    class InterruptedClient:
+        def __init__(self):
+            self.requests = []
+
+        def infer(self, request):
+            self.requests.append(dict(request))
+            if request.get("op") == "reset":
+                return {"status": "reset"}
+            raise ConnectionError("connection dropped after request")
+
+    class ResumedClient:
+        def __init__(self):
+            self.requests = []
+
+        def infer(self, request):
+            self.requests.append(dict(request))
+            if request.get("op") == "reset":
+                return {"status": "reset"}
+            return {
+                "actions": np.zeros((1, 9), dtype=np.float32),
+                "action_id": request["runtime_action_id"],
+            }
+
+    interrupted = InterruptedClient()
+    resumed = ResumedClient()
+    clients = iter((interrupted, resumed))
+    monkeypatch.setattr(runtime_client, "make_client", lambda host, port: next(clients))
+    policy = runtime_client.Policy(
+        {"state_dim": 9, "use_tactile": True, "marker_count": 63, "reconnect_attempts": 1}
+    )
+    task = _Task()
+
+    policy.eval(task, _observation())
+    policy.eval(task, _observation())
+
+    assert [request.get("op") for request in interrupted.requests] == ["reset", None]
+    assert [request.get("op") for request in resumed.requests] == [None, None]
+    assert resumed.requests[0]["runtime_action_id"] == 0
+    assert "runtime_ack_action_id" not in resumed.requests[0]
+    assert resumed.requests[1]["runtime_action_id"] == 1
+    assert resumed.requests[1]["runtime_ack_action_id"] == 0
+    assert len(task.actions) == 2

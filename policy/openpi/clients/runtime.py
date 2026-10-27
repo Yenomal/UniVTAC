@@ -39,17 +39,18 @@ class Policy(BasePolicy):
         marker_count = args.get("marker_count")
         self._marker_count = int(marker_count) if marker_count is not None else None
         self._session_started = False
+        self._next_action_id = 0
+        self._last_executed_action_id: int | None = None
 
     def _reconnect(self) -> None:
         with contextlib.suppress(Exception):
             close_client(self._client)
         self._client = self._make_client()
-        self._session_started = False
 
     def _make_client(self):
         return make_client(self._host, self._port)
 
-    def _infer(self, request: dict[str, Any], *, reset_after_reconnect: bool = False) -> dict[str, Any]:
+    def _infer(self, request: dict[str, Any]) -> dict[str, Any]:
         for attempt in range(self._reconnect_attempts + 1):
             try:
                 return self._client.infer(request)
@@ -57,10 +58,6 @@ class Policy(BasePolicy):
                 if attempt >= self._reconnect_attempts or not is_connection_error(exc):
                     raise
                 self._reconnect()
-                if reset_after_reconnect:
-                    # A new public websocket owns a new Runtime session. Recreate
-                    # its server-side state before retrying the observation.
-                    self._reset_request()
         raise AssertionError("unreachable")
 
     def _reset_request(self) -> None:
@@ -71,6 +68,8 @@ class Policy(BasePolicy):
 
     def reset(self):
         self._reset_request()
+        self._next_action_id = 0
+        self._last_executed_action_id = None
 
     def needs_observation(self, task) -> bool:
         return True
@@ -87,11 +86,26 @@ class Policy(BasePolicy):
             left_tactile=self._left_tactile, right_tactile=self._right_tactile,
             marker_count=self._marker_count,
         )
-        response = self._infer(payload, reset_after_reconnect=True)
+        action_id = self._next_action_id
+        payload["runtime_action_id"] = action_id
+        if self._last_executed_action_id is not None:
+            payload["runtime_ack_action_id"] = self._last_executed_action_id
+        response = self._infer(payload)
+        if response.get("action_id") != action_id:
+            raise RuntimeError(
+                f"OpenPI Runtime returned action_id {response.get('action_id')!r}; "
+                f"expected {action_id}"
+            )
         actions = select_actions(response, action_dim=self._state_dim, action_indices=self._action_indices)
         if len(actions) != 1:
             raise ValueError(f"Runtime must return one action per observation, got {len(actions)}")
-        task.take_action(torch.as_tensor(compress_qpos(actions)[0], device=task.device), action_type="qpos")
+        execution = task.take_action(
+            torch.as_tensor(compress_qpos(actions)[0], device=task.device), action_type="qpos"
+        )
+        if isinstance(execution, tuple) and execution and not bool(execution[0]):
+            raise RuntimeError(f"Runtime action {action_id} was not executed successfully")
+        self._last_executed_action_id = action_id
+        self._next_action_id = action_id + 1
 
     def close(self):
         close_client(self._client)
