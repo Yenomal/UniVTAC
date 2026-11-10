@@ -1,5 +1,5 @@
 policy_name: SmolVLA
-host: 127.0.0.1
+host: 10.15.88.85
 port: 8000
 timeout_s: 10.0
 side_camera: head
@@ -12,3 +12,5 @@ use_tactile: false
 left_tactile: left_tactile
 right_tactile: right_tactile
 action_indices: null
+instruction_type: seen
+instruction_file: null
