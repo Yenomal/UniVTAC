@@ -153,9 +153,17 @@ class RuntimeClient:
         ):
             raise ValueError("Runtime response correlation does not match its request")
         body = response.get("body", {})
-        if body.get("protocol_version") != PROTOCOL_VERSION:
+        message_type = response.get("message_type")
+        protocol_version = body.get("protocol_version")
+        # The current Runtime server omits protocol_version on legacy control
+        # acknowledgements (and on error envelopes), while action responses
+        # include it. Keep action replies strict and accept only those known
+        # legacy response types without the field.
+        if protocol_version != PROTOCOL_VERSION and not (
+            protocol_version is None and message_type in {"ack", "error"}
+        ):
             raise ValueError("Unsupported Runtime protocol version in response")
-        if response.get("message_type") == "error":
+        if message_type == "error":
             raise RuntimeError(body.get("message", "Runtime server error"))
         return body
 

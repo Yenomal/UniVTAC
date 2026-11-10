@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from policy.SmolVLA import deploy_policy
+from policy.SmolVLA import deploy_policy, runtime_client
 
 
 class _Task:
@@ -69,3 +69,35 @@ def test_smolvla_runtime_maps_observation_executes_action_then_acknowledges(monk
 def test_smolvla_client_requests_observation_every_control_step():
     policy = deploy_policy.Policy.__new__(deploy_policy.Policy)
     assert policy.needs_observation(object())
+
+
+def test_runtime_client_accepts_legacy_ack_without_protocol_version(monkeypatch):
+    client = runtime_client.RuntimeClient("127.0.0.1", 8000)
+    client._socket = object()
+    request_box = {}
+
+    def pack(message):
+        request_box["message"] = message
+        return b"request"
+
+    def recv(_socket):
+        request = request_box["message"]
+        return {
+            "version": 1,
+            "message_type": "ack",
+            "instance_id": "runtime",
+            "session_id": request["session_id"],
+            "generation": request["generation"],
+            "request_id": request["request_id"],
+            "body": {"op": "reset"},
+        }
+
+    class _Socket:
+        def sendall(self, payload):
+            assert payload == b"request"
+
+    client._socket = _Socket()
+    monkeypatch.setattr(runtime_client, "_pack", pack)
+    monkeypatch.setattr(runtime_client, "_recv", recv)
+
+    client.reset()

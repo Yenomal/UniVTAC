@@ -6,8 +6,8 @@ side_camera: head
 wrist_camera: wrist
 state_dim: 9
 state_feature: observation.state
-side_feature: observation.images.image
-wrist_feature: observation.images.image2
+side_feature: observation.images.camera1
+wrist_feature: observation.images.camera2
 use_tactile: false
 left_tactile: left_tactile
 right_tactile: right_tactile
