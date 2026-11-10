@@ -1,0 +1,14 @@
+policy_name: SmolVLA
+host: 127.0.0.1
+port: 8000
+timeout_s: 10.0
+side_camera: head
+wrist_camera: wrist
+state_dim: 9
+state_feature: observation.state
+side_feature: observation.images.image
+wrist_feature: observation.images.image2
+use_tactile: false
+left_tactile: left_tactile
+right_tactile: right_tactile
+action_indices: null
