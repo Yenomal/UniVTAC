@@ -75,10 +75,10 @@ class Policy(BasePolicy):
         if self._use_tactile:
             try:
                 tactile = observation["tactile"]
-                features["observation.tactile.left"] = _as_array(
+                features["observation.tactile.left_marker"] = _as_array(
                     tactile[self._left_tactile]["marker"], np.float32
                 )
-                features["observation.tactile.right"] = _as_array(
+                features["observation.tactile.right_marker"] = _as_array(
                     tactile[self._right_tactile]["marker"], np.float32
                 )
             except KeyError as exc:
