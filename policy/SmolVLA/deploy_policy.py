@@ -99,6 +99,13 @@ class Policy(BasePolicy):
         if not self._started:
             self.reset()
         response = self._client.observe(self._features(observation), task=task.instruction, sequence=self._sequence)
+        
+        # print(
+        #     f"runtime action_id={response['action_id']} "
+        #     f"queue_size={response.get('queue_size')} "
+        #     f"replayed={response.get('replayed', False)}"
+        # )
+        
         action = response["action"]
         if self._action_indices is not None:
             indices = tuple(int(index) for index in self._action_indices)

@@ -9,3 +9,4 @@ export CUDA_VISIBLE_DEVICES=$GPU
 python scripts/eval_policy.py "$TASK_NAME" "$TASK_CONFIG" "$POLICY_CONIFG" --headless "$@"
 
 # bash eval_policy.sh ACT/deploy_policy_insert_lean 0
+curl -d "over from 403" https://ntfy.sh/univtac
