@@ -94,7 +94,8 @@ def log(msg):
 
 def eval_policy(
     task: 'BaseTask', policy: 'BasePolicy', expert_check,
-    start_seed, max_seed, test_total_num, instructions, instruciton_type:Literal['seen', 'unseen']='seen'
+    start_seed, max_seed, test_total_num, instructions, instruciton_type:Literal['seen', 'unseen']='seen',
+    action_logger=None,
 ):
     test_num, succ_num, seed = 0, 0, start_seed
 
@@ -141,6 +142,8 @@ def eval_policy(
         eval_start = time.perf_counter()
         task.mode = 'eval'
         try:
+            if action_logger is not None:
+                action_logger.start_episode(seed)
             task.reset(seed=seed, instructions=instructions[instruciton_type])
             task.mean_steps = task.cfg.step_lim
             policy.reset()
@@ -173,6 +176,8 @@ def eval_policy(
                 f"Instruction: {task.instruction}\n"
                 f"Total {succ_num}/{test_num}({succ_num/test_num*100:.2f}%) success.")
         finally:
+            if action_logger is not None:
+                action_logger.close()
             seed += 1
     
     return {
@@ -254,8 +259,14 @@ def main():
         else env_cfg.sim.device
     seed = deploy_config.get("seed", 0)
 
+    from policy._action_logger import make_action_logger
+    action_logger = make_action_logger(policy_name, env_cfg.save_dir)
+    policy_args = dict(deploy_config)
+    if action_logger is not None:
+        policy_args["action_logger"] = action_logger
+
     init_start = time.perf_counter()
-    policy:BasePolicy = policy_module.Policy(deploy_config)
+    policy:BasePolicy = policy_module.Policy(policy_args)
     policy_init_cost = time.perf_counter() - init_start
 
     init_start = time.perf_counter()
@@ -280,7 +291,8 @@ def main():
         max_seed=args_cli.max_seed,
         test_total_num=args_cli.total_num,
         instructions=instructions,
-        instruciton_type=deploy_config.get("instruction_type", "seen")
+        instruciton_type=deploy_config.get("instruction_type", "seen"),
+        action_logger=action_logger,
     )
     log(f"Final Result: {results['succ_num']}/{results['test_num']}({results['succ_num']/results['test_num']*100:.2f}%) success.")
     

@@ -35,6 +35,7 @@ class Policy(BasePolicy):
 
     def __init__(self, args: Mapping[str, Any]):
         super().__init__(args)
+        self._action_logger = args.get("action_logger")
         self._client = RuntimeClient(
             args.get("host", "127.0.0.1"),
             int(args.get("port", 8000)),
@@ -99,6 +100,10 @@ class Policy(BasePolicy):
         if not self._started:
             self.reset()
         response = self._client.observe(self._features(observation), task=task.instruction, sequence=self._sequence)
+        if self._action_logger is not None:
+            self._action_logger.record(
+                response["action"], step=task.take_action_cnt, action_id=response.get("action_id")
+            )
         
         # print(
         #     f"runtime action_id={response['action_id']} "

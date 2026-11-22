@@ -61,3 +61,32 @@ or
 bash parallel_eval.sh ${task_name} ${task_config} ${policy_config} ${gpu_id} [num_processes] [total_num]
 # Example: bash parallel_eval.sh lift_bottle demo YourPolicy/deploy 3 0,1,2
 ```
+
+## Policy action logs
+
+Evaluations of `openpi` (the `runtime` and `runtime_streaming` backends) and
+`SmolVLA` automatically save raw policy actions to
+`eval_result/<policy>/<task>/<deploy_config>/<run>/actions/<seed>.parquet`.
+Parallel evaluation saves them under each worker's directory:
+`<run>/<worker>/actions/<seed>.parquet`.
+Install `pyarrow` in the UniVTAC client environment if updating an existing
+installation (`python -m pip install pyarrow`); `scripts/install.sh` includes it.
+
+Actions are recorded after the client decodes and accepts the policy response,
+before `action_indices` mapping, gripper compression, or execution. Each
+returned action vector is one row, so a chunk produces multiple rows even if
+some of its actions are never executed. The file is finalized when the episode
+ends, including on evaluation errors. Expert checks are excluded.
+
+Columns are `seed`, `request_index` (response order within the episode),
+`chunk_index` (row within the response), `step` (control action count when the
+response arrived), `timestamp` (Unix seconds), `action_id` (when supplied by the
+server), and `action` (the complete list of values, stored as float64 to preserve
+the precision of both float32 and float64 policy responses).
+
+```python
+import pyarrow.parquet as pq
+
+actions = pq.read_table("eval_result/.../actions/1000000.parquet")
+print(actions.to_pydict())
+```

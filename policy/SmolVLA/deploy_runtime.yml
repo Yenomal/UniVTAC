@@ -8,7 +8,7 @@ state_dim: 9
 state_feature: observation.state
 side_feature: observation.images.camera1
 wrist_feature: observation.images.camera2
-use_tactile: false
+use_tactile: true
 left_tactile: left_tactile
 right_tactile: right_tactile
 action_indices: null

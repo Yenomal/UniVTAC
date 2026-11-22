@@ -21,4 +21,8 @@ Run a UniVTAC evaluation on the robot/simulation host:
 bash eval_policy.sh pull_out_key openpi SmolVLA/deploy_runtime 0
 ```
 
-The final argument is UniVTAC's simulation GPU selection. It is independent from the Runtime server's `--device` setting. The client environment needs NumPy, PyTorch, PyYAML, and `msgpack`.
+The final argument is UniVTAC's simulation GPU selection. It is independent from the Runtime server's `--device` setting. The client environment needs NumPy, PyTorch, PyYAML, `msgpack`, and `pyarrow`.
+
+Evaluation saves every raw policy action to `actions/<seed>.parquet` inside the
+evaluation result directory, before dimension mapping or gripper compression.
+See [Policy action logs](../../docs/Deploy.md#policy-action-logs) for the schema.

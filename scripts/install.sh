@@ -161,7 +161,7 @@ else
     ${uv_exe} pip install -e source/tacex_uipc -v --no-build-isolation
 fi
 
-${uv_exe} pip install transforms3d trimesh tetgen
+${uv_exe} pip install transforms3d trimesh tetgen pyarrow
 
 echo "Installation completed successfully!"
 echo "Running UniVTAC environment validation..."

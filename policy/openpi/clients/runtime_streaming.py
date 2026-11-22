@@ -23,6 +23,7 @@ class Policy(BasePolicy):
 
     def __init__(self, args: dict[str, Any]):
         super().__init__(args)
+        self._action_logger = args.get("action_logger")
         self._client = make_client(
             args.get("host", "127.0.0.1"), int(args.get("port", 8000))
         )
@@ -68,6 +69,10 @@ class Policy(BasePolicy):
             marker_count=self._marker_count,
         )
         response = self._client.infer(payload)
+        if self._action_logger is not None:
+            self._action_logger.record(
+                response["actions"], step=task.take_action_cnt, action_id=response.get("action_id")
+            )
         actions = select_actions(
             response,
             action_dim=self._state_dim,

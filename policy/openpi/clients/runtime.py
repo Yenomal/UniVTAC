@@ -25,6 +25,7 @@ class Policy(BasePolicy):
 
     def __init__(self, args: dict[str, Any]):
         super().__init__(args)
+        self._action_logger = args.get("action_logger")
         self._host = args.get("host", "127.0.0.1")
         self._port = int(args.get("port", 8000))
         self._reconnect_attempts = int(args.get("reconnect_attempts", 1))
@@ -93,6 +94,10 @@ class Policy(BasePolicy):
         if self._last_executed_action_id is not None:
             payload["runtime_ack_action_id"] = self._last_executed_action_id
         response = self._infer(payload)
+        if self._action_logger is not None:
+            self._action_logger.record(
+                response["actions"], step=task.take_action_cnt, action_id=response.get("action_id")
+            )
         if response.get("action_id") != action_id:
             raise RuntimeError(
                 f"OpenPI Runtime returned action_id {response.get('action_id')!r}; "

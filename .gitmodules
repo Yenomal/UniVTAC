@@ -1,3 +1,7 @@
 [submodule "third_party/Master_Research"]
 	path = third_party/Master_Research
 	url = https://github.com/Yenomal/Master_Research.git
+
+[submodule "third_party/lerobot"]
+	path = third_party/lerobot
+	url = https://github.com/Yenomal/lerobot.git

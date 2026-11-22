@@ -95,8 +95,14 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
         env_cfg.scene.num_envs = 1
 
         # Device stays default; CUDA env controls GPU routing
+        from policy._action_logger import make_action_logger
+        action_logger = make_action_logger(policy_name, worker_save_dir)
+        policy_args = dict(deploy_config)
+        if action_logger is not None:
+            policy_args["action_logger"] = action_logger
+
         init_start = time.perf_counter()
-        policy:'BasePolicy' = policy_module.Policy(deploy_config)
+        policy:'BasePolicy' = policy_module.Policy(policy_args)
         policy_init_cost = time.perf_counter() - init_start
 
         init_start = time.perf_counter()
@@ -142,6 +148,8 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
             eval_start = time.perf_counter()
             task.mode = 'eval'
             try:
+                if action_logger is not None:
+                    action_logger.start_episode(seed)
                 task.reset(seed=seed, instructions=instructions[deploy_config.get("instruction_type", "seen")])
                 task.mean_steps = task.cfg.step_lim
                 policy.reset()
@@ -200,6 +208,9 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
                     'actions': task.take_action_cnt,
                     'traceback': None,
                 })
+            finally:
+                if action_logger is not None:
+                    action_logger.close()
         try:
             task.close()
             policy.close()
