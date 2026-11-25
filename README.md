@@ -62,11 +62,25 @@ Each policy is a self-contained module under `policy/` with its own data process
 bash eval_policy.sh ${task_name} ${task_config} ${policy_config} ${gpu_id}
 ```
 
+Use `--run_name my_run` to reuse a named result directory. Add `--resume` to delete that directory's existing contents and recreate it before evaluation:
+
+```bash
+bash eval_policy.sh ${task_name} ${task_config} ${policy_config} ${gpu_id} --run_name my_run --resume
+```
+
 For parallel evaluation over many seeds:
 
 ```bash
 bash parallel_eval.sh ${task_name} ${task_config} ${policy_config} ${gpu_id} [num_processes] [total_num]
 ```
+
+Parallel evaluation also supports `--run_name` and `--resume`. With both flags, the main process resets the shared run directory before starting any workers:
+
+```bash
+bash parallel_eval.sh ${task_name} ${task_config} ${policy_config} ${gpu_id} 2 100 --run_name my_run --resume
+```
+
+The optional process and test counts can be omitted when passing these flags; they default to 2 and 100.
 
 The evaluation results, including videos and success rate logs, will be saved in the `eval_result/` directory under the project root.
 

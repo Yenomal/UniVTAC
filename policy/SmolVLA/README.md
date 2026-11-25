@@ -23,6 +23,19 @@ bash eval_policy.sh pull_out_key openpi SmolVLA/deploy_runtime 0
 
 The final argument is UniVTAC's simulation GPU selection. It is independent from the Runtime server's `--device` setting. The client environment needs NumPy, PyTorch, PyYAML, `msgpack`, and `pyarrow`.
 
+The current Runtime server accepts one active client per server instance. The
+parallel evaluation launcher passes the same host and port to every worker, so
+use one worker with this adapter and a single Runtime server:
+
+```bash
+bash parallel_eval.sh lift_bottle yenomal SmolVLA/deploy_runtime 0 1 50 --run_name my_run
+```
+
+Running several SmolVLA workers requires independent Runtime server instances
+and a separate endpoint assignment for each worker. Parallel simulation workers
+run headless with camera rendering enabled and livestreaming disabled, avoiding
+conflicts on Isaac Sim's HTTP and streaming ports.
+
 Evaluation saves every raw policy action to `actions/<seed>.parquet` inside the
 evaluation result directory, before dimension mapping or gripper compression.
 See [Policy action logs](../../docs/Deploy.md#policy-action-logs) for the schema.

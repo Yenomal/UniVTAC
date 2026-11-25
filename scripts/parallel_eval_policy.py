@@ -10,6 +10,7 @@ import io
 from tqdm import tqdm
 from queue import Empty
 from pathlib import Path
+from shutil import rmtree
 from typing import Literal, TYPE_CHECKING
 from multiprocessing import Process, Queue, Manager, Event, current_process
 
@@ -62,7 +63,9 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
     # Build minimal args for app
     app_args = parser.parse_args([])  # empty to use defaults
     app_args.enable_cameras = True
-    app_args.livestream = 2
+    # Each livestream instance binds shared ports; batch workers only need camera rendering.
+    app_args.headless = True
+    app_args.livestream = 0
     app_args.num_envs = 1
 
     app_launcher = AppLauncher(app_args)
@@ -230,6 +233,10 @@ def main():
     parser.add_argument("task_name", type=str, help="Task name")
     parser.add_argument("task_config", type=str, help="Task config")
     parser.add_argument("deploy_config", type=str, help="Deploy file name")
+    parser.add_argument("--run_name", type=str, default=None,
+                        help="Evaluation result directory name. Defaults to the start timestamp.")
+    parser.add_argument("--resume", action='store_true',
+                        help="With --run_name, delete and recreate that run's result directory before evaluation.")
     parser.add_argument("--workers", type=int, default=2, help="Number of worker processes")
     parser.add_argument("--total_num", type=int, default=100, help="Total tests across all workers")
     parser.add_argument("--gpu", type=str, default=os.environ.get('CUDA_VISIBLE_DEVICES', ''),
@@ -259,9 +266,19 @@ def main():
     except Exception:
         instructions = {'seen': ['Empty'], 'unseen': ['Empty']}
 
-    # Base save dir with unified date
-    curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
-    base_save_dir = Path('eval_result') / policy_name / args.task_name / deploy_config_file.stem / curr_time
+    # Prepare the shared run directory once, before logs or workers are created.
+    run_name = args.run_name or time.strftime(r'%Y-%m-%d_%H:%M:%S')
+    results_root = Path('eval_result') / policy_name / args.task_name / deploy_config_file.stem
+    base_save_dir = results_root / run_name
+    if args.resume and args.run_name:
+        resolved_root = results_root.resolve()
+        if (
+            Path('eval_result').resolve() not in resolved_root.parents
+            or resolved_root not in base_save_dir.resolve().parents
+        ):
+            raise ValueError("--resume requires --run_name to stay inside the evaluation result directory.")
+        if base_save_dir.exists():
+            rmtree(base_save_dir)
     base_save_dir.mkdir(parents=True, exist_ok=True)
     out_log = base_save_dir / 'out.log'
     clean_log = base_save_dir / 'log.log'

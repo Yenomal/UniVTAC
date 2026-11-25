@@ -1,7 +1,7 @@
 save_dir: ./data
 
-# Hold each policy action for four 120 Hz physics steps.
-decimation: 4
+# Hold each policy action for two 120 Hz physics steps.
+decimation: 2
 
 save_frequency: 2
 video_frequency: 2

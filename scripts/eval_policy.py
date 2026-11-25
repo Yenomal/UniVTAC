@@ -1,4 +1,4 @@
-from shutil import ExecError
+from shutil import ExecError, rmtree
 import sys
 
 sys.path.append(".")
@@ -58,6 +58,11 @@ parser.add_argument(
     type=str,
     default=None,
     help="Evaluation result directory name. Defaults to the start timestamp."
+)
+parser.add_argument(
+    "--resume",
+    action='store_true',
+    help="With --run_name, delete and recreate that run's result directory before evaluation."
 )
 parser.add_argument(
     "--print_only",
@@ -232,7 +237,14 @@ def main():
     run_name = args_cli.run_name or time.strftime(r'%Y-%m-%d_%H:%M:%S')
 
     env_cfg:BaseTaskCfg = task_module.TaskCfg()
-    env_cfg.save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem / run_name
+    base_save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem
+    env_cfg.save_dir = base_save_dir / run_name
+    if args_cli.resume and args_cli.run_name:
+        if base_save_dir.resolve() not in env_cfg.save_dir.resolve().parents:
+            raise ValueError("--resume requires --run_name to stay inside the evaluation result directory.")
+        if env_cfg.save_dir.exists():
+            rmtree(env_cfg.save_dir)
+        env_cfg.save_dir.mkdir(parents=True, exist_ok=True)
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.obs_data_type = task_config.get("observations", {})
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)

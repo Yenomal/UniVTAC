@@ -170,11 +170,13 @@ def test_smolvla_logs_raw_action_even_when_execution_fails(tmp_path, monkeypatch
 @pytest.fixture
 def eval_app(monkeypatch):
     # Exercise eval code without starting Isaac Sim or parsing pytest's argv.
+    launches = []
+
     class _AppLauncher:
         app = types.SimpleNamespace(close=lambda: None)
 
         def __init__(self, args):
-            pass
+            launches.append(args)
 
         @staticmethod
         def add_app_launcher_args(parser):
@@ -185,6 +187,7 @@ def eval_app(monkeypatch):
     monkeypatch.setitem(sys.modules, "isaaclab.app", fake_app)
     monkeypatch.setattr(sys, "path", list(sys.path))
     monkeypatch.setattr(sys, "argv", ["eval_policy.py", "task", "config", "deploy"])
+    return launches
 
 
 @pytest.mark.parametrize("fail", [False, True])
@@ -303,3 +306,7 @@ def test_parallel_eval_injects_logger_and_finalizes_worker_file(tmp_path, monkey
     assert deploy_config == {"policy_name": "SmolVLA"}
     rows = pq.read_table(tmp_path / "2" / "actions" / "42.parquet").to_pylist()
     assert rows[0]["action"] == list(range(9))
+    # Workers render camera frames without starting competing livestream servers.
+    assert eval_app[0].livestream == 0
+    assert eval_app[0].headless is True
+    assert eval_app[0].enable_cameras is True
