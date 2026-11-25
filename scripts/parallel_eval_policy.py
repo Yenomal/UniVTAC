@@ -96,6 +96,9 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
                 "tactile_sensor_type", task_config.get("sensor_type", env_cfg.tactile_sensor_type)
             )
         env_cfg.scene.num_envs = 1
+        # TacEx finds gelpad attachment points through PhysX scene queries.
+        # Livestreaming enables these implicitly; headless workers must opt in.
+        env_cfg.sim.enable_scene_query_support = True
 
         # Device stays default; CUDA env controls GPU routing
         from policy._action_logger import make_action_logger
@@ -168,7 +171,6 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
                 print(f"[Worker {worker_id}] Seed {seed} exception: {e}\n{traceback.format_exc()}")
                 succ_status = 'error'
                 task.clean_cache(result=succ_status)
-                progress['errors'] += 1
                 status_dict['errors'] += 1
                 status_dict['last_result'] = 'error'
                 status_dict['last_cost'] = None
@@ -190,9 +192,7 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
                 succ_status = 'success' if succ else 'failed'
                 task.clean_cache(result=succ_status)
                 if succ:
-                    progress['succ'] += 1
                     status_dict['succ'] += 1
-                progress['done'] += 1
                 status_dict['done'] += 1
                 status_dict['last_result'] = succ_status
                 status_dict['last_cost'] = eval_cost
@@ -288,7 +288,8 @@ def main():
     # Seed producer-consumer
     manager = Manager()
     seed_q = Queue()
-    progress = manager.dict(done=0, succ=0, errors=0)
+    # Only the parent updates totals, from result events, to avoid lost increments.
+    progress = dict(done=0, succ=0, errors=0)
     stop_event = Event()
     result_q = Queue()
 
@@ -348,45 +349,65 @@ def main():
     pbar_io = io.StringIO()
     pbar = tqdm(total=args.total_num, file=pbar_io, ncols=100)
 
+    pending = 0  # Assigned seeds whose result event has not been processed yet.
+
+    def dispatch_seeds():
+        nonlocal next_seed, pending
+        # Reserve a result slot for every queued/running episode. Errors release
+        # their reservation without increasing done, so only errors are replaced.
+        available = min(args.workers - pending, args.total_num - progress['done'] - pending)
+        for _ in range(available):
+            seed_q.put(next_seed)
+            next_seed += 1
+            pending += 1
+        if progress['done'] >= args.total_num and not stop_event.is_set():
+            stop_event.set()
+            for _ in workers:
+                seed_q.put(None)
+
+    def drain_results():
+        nonlocal pending
+        while True:
+            try:
+                event = result_q.get_nowait()
+            except Empty:
+                return
+            pending -= 1
+            prefix = f"Worker-{event['worker']} Seed {event['seed']}"
+            if event['result'] == 'success':
+                progress['done'] += 1
+                progress['succ'] += 1
+                write_clean(f"{prefix} success in {event['cost']:.2f}s; steps {event['steps']}, actions {event['actions']}")
+            elif event['result'] == 'failed':
+                progress['done'] += 1
+                write_clean(f"{prefix} failed in {event['cost']:.2f}s; steps {event['steps']}, actions {event['actions']}")
+            else:
+                progress['errors'] += 1
+                write_clean(f"{prefix} error; see out.log for traceback")
+            write_out(f"{prefix} result={event['result']} cost={event['cost']} steps={event['steps']} actions={event['actions']}")
+
     # Status board and producer loop
     try:
         last_update = 0
         last_render = 0
         last_block = ""
-        # Prime the queue with up to workers seeds to start
-        for _ in range(args.workers):
-            seed_q.put(next_seed)
-            next_seed += 1
+        dispatch_seeds()
 
-        while any(p.is_alive() for p in workers):
-            # Drain results queue and log clean summaries
-            while True:
-                try:
-                    event = result_q.get_nowait()
-                except Empty:
-                    break
-                else:
-                    prefix = f"Worker-{event['worker']} Seed {event['seed']}"
-                    if event['result'] == 'success':
-                        write_clean(f"{prefix} success in {event['cost']:.2f}s; steps {event['steps']}, actions {event['actions']}")
-                    elif event['result'] == 'failed':
-                        write_clean(f"{prefix} failed in {event['cost']:.2f}s; steps {event['steps']}, actions {event['actions']}")
-                    else:
-                        write_clean(f"{prefix} error; see out.log for traceback")
-                    write_out(f"{prefix} result={event['result']} cost={event['cost']} steps={event['steps']} actions={event['actions']}")
-
-                    if done < args.total_num:
-                        # Feed more seeds; try to keep queue non-empty
-                        # Put a few seeds per iteration to avoid starvation
-                        for _ in range(args.workers):
-                            seed_q.put(next_seed)
-                            next_seed += 1
-                    else:
-                        # Signal workers to stop once target reached
-                        for _ in range(args.workers):
-                            seed_q.put(None)
-                        # Wait for workers to drain and exit
-                        stop_event.set()
+        while True:
+            drain_results()
+            exited_workers = [
+                p for p in workers
+                if p.exitcode is not None and (p.exitcode != 0 or not stop_event.is_set())
+            ]
+            if exited_workers:
+                details = ', '.join(f"{p.name} (exit code {p.exitcode})" for p in exited_workers)
+                message = f"{details} exited unexpectedly"
+                write_clean(message)
+                write_out(message)
+                raise RuntimeError(message)
+            if not any(p.is_alive() for p in workers):
+                break
+            dispatch_seeds()
 
             # Keep feeding seeds until reaching target completed (done)
             done = progress.get('done', 0)
@@ -434,8 +455,13 @@ def main():
     finally:
         pbar.close()
         pbar_io.close()
+        stop_event.set()
+        for _ in workers:
+            seed_q.put(None)
         for p in workers:
             p.join()
+        # A worker may exit just after the loop's last poll. Include its result.
+        drain_results()
         print("\n[Status] All workers finished.")
         # Final summary
         total = args.total_num

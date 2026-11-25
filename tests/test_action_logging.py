@@ -244,6 +244,8 @@ def test_parallel_eval_injects_logger_and_finalizes_worker_file(tmp_path, monkey
 
         def __init__(self, cfg, mode):
             self.cfg = cfg
+            # TacEx discovers gelpad attachment points through PhysX scene queries.
+            assert cfg.sim.enable_scene_query_support is True
 
         def _step_callback(self, status):
             pass
@@ -281,6 +283,7 @@ def test_parallel_eval_injects_logger_and_finalizes_worker_file(tmp_path, monkey
     task_module.TaskCfg = lambda: types.SimpleNamespace(
         decimation=1, save_frequency=0, video_frequency=0,
         scene=types.SimpleNamespace(num_envs=1), step_lim=1,
+        sim=types.SimpleNamespace(enable_scene_query_support=False),
     )
     policy_module = types.ModuleType("policy.SmolVLA")
     policy_module.Policy = _Policy

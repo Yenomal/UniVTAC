@@ -23,18 +23,20 @@ bash eval_policy.sh pull_out_key openpi SmolVLA/deploy_runtime 0
 
 The final argument is UniVTAC's simulation GPU selection. It is independent from the Runtime server's `--device` setting. The client environment needs NumPy, PyTorch, PyYAML, `msgpack`, and `pyarrow`.
 
-The current Runtime server accepts one active client per server instance. The
-parallel evaluation launcher passes the same host and port to every worker, so
-use one worker with this adapter and a single Runtime server:
+The current Runtime server creates an independent session for each client's
+`session_id`. Parallel evaluation workers each create their own client, and can
+connect to the same Runtime host and port:
 
 ```bash
-bash parallel_eval.sh lift_bottle yenomal SmolVLA/deploy_runtime 0 1 50 --run_name my_run
+bash parallel_eval.sh lift_bottle yenomal SmolVLA/deploy_runtime 0 4 50 --run_name my_run
 ```
 
-Running several SmolVLA workers requires independent Runtime server instances
-and a separate endpoint assignment for each worker. Parallel simulation workers
-run headless with camera rendering enabled and livestreaming disabled, avoiding
-conflicts on Isaac Sim's HTTP and streaming ports.
+Parallel simulation workers run headless with camera rendering enabled and
+livestreaming disabled, avoiding conflicts on Isaac Sim's HTTP and streaming ports.
+
+Headless workers explicitly enable PhysX scene queries, which TacEx needs to
+attach the tactile gelpads to the moving gripper. Camera rendering alone does
+not enable these queries.
 
 Evaluation saves every raw policy action to `actions/<seed>.parquet` inside the
 evaluation result directory, before dimension mapping or gripper compression.

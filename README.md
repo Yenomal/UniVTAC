@@ -82,6 +82,11 @@ bash parallel_eval.sh ${task_name} ${task_config} ${policy_config} ${gpu_id} 2 1
 
 The optional process and test counts can be omitted when passing these flags; they default to 2 and 100.
 
+`--total_num` limits completed evaluations across all workers: both success and
+ordinary failure count toward the total. Episodes that raise exceptions are
+replaced. The dispatcher reserves slots for running episodes so the total is
+not exceeded when workers finish concurrently.
+
 The evaluation results, including videos and success rate logs, will be saved in the `eval_result/` directory under the project root.
 
 To deploy your own policy, refer to the [Deploy Your Policy](./docs/Deploy.md).
