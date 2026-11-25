@@ -73,8 +73,8 @@ def run_eval(request, tmp_path, monkeypatch):
     return run
 
 
-@pytest.mark.parametrize("resume", [False, True])
-def test_named_run_only_clears_existing_results_with_resume(tmp_path, run_eval, resume):
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_named_run_only_clears_existing_results_with_overwrite(tmp_path, run_eval, overwrite):
     base_dir = tmp_path / "eval_result" / "directory_test" / "directory_test" / "deploy"
     run_dir = base_dir / "my_run"
     old_video = run_dir / "video" / "42.mp4"
@@ -88,10 +88,10 @@ def test_named_run_only_clears_existing_results_with_resume(tmp_path, run_eval, 
     other_run.mkdir()
     (other_run / "log.log").write_text("other run\n")
 
-    run_eval("--run_name", "my_run", *(["--resume"] if resume else []))
+    run_eval("--run_name", "my_run", *(["--overwrite"] if overwrite else []))
 
     assert run_dir.is_dir()
-    if resume:
+    if overwrite:
         assert not old_video.exists()
         assert not old_log.exists() or "old log" not in old_log.read_text()
     else:
@@ -101,26 +101,26 @@ def test_named_run_only_clears_existing_results_with_resume(tmp_path, run_eval, 
     assert (other_run / "log.log").read_text() == "other run\n"
 
 
-def test_resume_creates_a_missing_named_run(tmp_path, run_eval):
-    run_eval("--resume", "--run_name", "new_run")
+def test_overwrite_creates_a_missing_named_run(tmp_path, run_eval):
+    run_eval("--overwrite", "--run_name", "new_run")
 
     run_dir = tmp_path / "eval_result" / "directory_test" / "directory_test" / "deploy" / "new_run"
     assert run_dir.is_dir()
 
 
-def test_resume_without_a_run_name_preserves_existing_runs(tmp_path, run_eval):
+def test_overwrite_without_a_run_name_preserves_existing_runs(tmp_path, run_eval):
     run_dir = tmp_path / "eval_result" / "directory_test" / "directory_test" / "deploy" / "my_run"
     run_dir.mkdir(parents=True)
     old_log = run_dir / "log.log"
     old_log.write_text("old log\n")
 
-    run_eval("--resume")
+    run_eval("--overwrite")
 
     assert old_log.read_text() == "old log\n"
 
 
 @pytest.mark.parametrize("run_name", [".", "..", "../../outside", "absolute", "linked"])
-def test_resume_rejects_paths_outside_the_run_directory(tmp_path, run_eval, run_name):
+def test_overwrite_rejects_paths_outside_the_run_directory(tmp_path, run_eval, run_name):
     base_dir = tmp_path / "eval_result" / "directory_test" / "directory_test" / "deploy"
     base_dir.mkdir(parents=True)
     outside = tmp_path / "outside"
@@ -135,7 +135,7 @@ def test_resume_rejects_paths_outside_the_run_directory(tmp_path, run_eval, run_
         (base_dir / run_name).symlink_to(outside, target_is_directory=True)
 
     with pytest.raises(ValueError, match="--run_name"):
-        run_eval("--resume", "--run_name", run_name)
+        run_eval("--overwrite", "--run_name", run_name)
 
     assert sentinel.read_text() == "keep this\n"
     assert shared_seeds.read_text() == "{}"

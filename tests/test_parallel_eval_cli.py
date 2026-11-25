@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 
-def test_parallel_resume_cannot_clear_results_outside_eval_root(tmp_path, monkeypatch):
+def test_parallel_overwrite_cannot_clear_results_outside_eval_root(tmp_path, monkeypatch):
     from scripts import parallel_eval_policy
 
     monkeypatch.chdir(tmp_path)
@@ -22,7 +22,7 @@ def test_parallel_resume_cannot_clear_results_outside_eval_root(tmp_path, monkey
     sentinel.write_text("keep this\n")
     monkeypatch.setattr(sys, "argv", [
         "parallel_eval_policy.py", str(outside), "task.yml", "deploy.yml",
-        "--run_name", "my_run", "--resume",
+        "--run_name", "my_run", "--overwrite",
     ])
 
     def stop_before_workers_start():
@@ -43,10 +43,10 @@ def test_parallel_resume_cannot_clear_results_outside_eval_root(tmp_path, monkey
         (["3"], "3", "100", []),
         (["3", "50"], "3", "50", []),
         (["", "50", "--run_name", "my_run"], "2", "50", ["--run_name", "my_run"]),
-        (["3", "", "--resume"], "3", "100", ["--resume"]),
-        (["--run_name", "my run", "--resume"], "2", "100", ["--run_name", "my run", "--resume"]),
+        (["3", "", "--overwrite"], "3", "100", ["--overwrite"]),
+        (["--run_name", "my run", "--overwrite"], "2", "100", ["--run_name", "my run", "--overwrite"]),
         (["3", "--run_name", "my_run"], "3", "100", ["--run_name", "my_run"]),
-        (["3", "50", "--run_name", "my_run", "--resume"], "3", "50", ["--run_name", "my_run", "--resume"]),
+        (["3", "50", "--run_name", "my_run", "--overwrite"], "3", "50", ["--run_name", "my_run", "--overwrite"]),
     ],
 )
 def test_parallel_eval_shell_forwards_flags_and_preserves_optional_counts(

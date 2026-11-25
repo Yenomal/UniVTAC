@@ -235,7 +235,7 @@ def main():
     parser.add_argument("deploy_config", type=str, help="Deploy file name")
     parser.add_argument("--run_name", type=str, default=None,
                         help="Evaluation result directory name. Defaults to the start timestamp.")
-    parser.add_argument("--resume", action='store_true',
+    parser.add_argument("--overwrite", action='store_true',
                         help="With --run_name, delete and recreate that run's result directory before evaluation.")
     parser.add_argument("--workers", type=int, default=2, help="Number of worker processes")
     parser.add_argument("--total_num", type=int, default=100, help="Total tests across all workers")
@@ -270,13 +270,13 @@ def main():
     run_name = args.run_name or time.strftime(r'%Y-%m-%d_%H:%M:%S')
     results_root = Path('eval_result') / policy_name / args.task_name / deploy_config_file.stem
     base_save_dir = results_root / run_name
-    if args.resume and args.run_name:
+    if args.overwrite and args.run_name:
         resolved_root = results_root.resolve()
         if (
             Path('eval_result').resolve() not in resolved_root.parents
             or resolved_root not in base_save_dir.resolve().parents
         ):
-            raise ValueError("--resume requires --run_name to stay inside the evaluation result directory.")
+            raise ValueError("--overwrite requires --run_name to stay inside the evaluation result directory.")
         if base_save_dir.exists():
             rmtree(base_save_dir)
     base_save_dir.mkdir(parents=True, exist_ok=True)

@@ -60,7 +60,7 @@ parser.add_argument(
     help="Evaluation result directory name. Defaults to the start timestamp."
 )
 parser.add_argument(
-    "--resume",
+    "--overwrite",
     action='store_true',
     help="With --run_name, delete and recreate that run's result directory before evaluation."
 )
@@ -239,9 +239,9 @@ def main():
     env_cfg:BaseTaskCfg = task_module.TaskCfg()
     base_save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem
     env_cfg.save_dir = base_save_dir / run_name
-    if args_cli.resume and args_cli.run_name:
+    if args_cli.overwrite and args_cli.run_name:
         if base_save_dir.resolve() not in env_cfg.save_dir.resolve().parents:
-            raise ValueError("--resume requires --run_name to stay inside the evaluation result directory.")
+            raise ValueError("--overwrite requires --run_name to stay inside the evaluation result directory.")
         if env_cfg.save_dir.exists():
             rmtree(env_cfg.save_dir)
         env_cfg.save_dir.mkdir(parents=True, exist_ok=True)
