@@ -426,6 +426,10 @@ class BaseTask(UipcRLEnv):
                 )
         self._update_render()
 
+        # Calibrate against the synchronized, unloaded gelpads before grasping.
+        self._tactile_manager.reset_marker_references()
+        self._update_render()
+
         self.pre_move()
         self.in_pre_move = False
 

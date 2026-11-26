@@ -278,6 +278,9 @@ class VisualTactileSensor:
         self.attach_to_init = np.linalg.inv(init_trans)
         self.attach_to_init = torch.tensor(self.attach_to_init, dtype=torch.float64, device=self.device)
 
+        self.reset_marker_reference()
+
+    def reset_marker_reference(self):
         self.sensor.marker_motion_simulator.marker_motion_sim.init_vertices()
 
     def get_attach_pose(self):
@@ -377,6 +380,10 @@ class TactileManager:
     def _reset_idx(self):
         for tact in self.tactiles.values():
             tact._reset_idx()
+
+    def reset_marker_references(self):
+        for tact in self.tactiles.values():
+            tact.reset_marker_reference()
 
     def setup(self):
         for tact in self.tactiles.values():
