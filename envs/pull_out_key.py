@@ -10,6 +10,8 @@ class Task(BaseTask):
         cfg.sim.physics_material.dynamic_friction = 2.0
         cfg.sim.physics_material.static_friction = 2.0
         cfg.uipc_sim.contact.default_friction_ratio = 2.0
+        if mode == "eval":
+            cfg.adaptive_grasp_depth_threshold = 28.0
         super().__init__(cfg, mode, render_mode, **kwargs)
 
     def create_actors(self) -> None:

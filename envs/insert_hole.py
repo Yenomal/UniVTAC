@@ -7,6 +7,8 @@ class TaskCfg(BaseTaskCfg):
 
 class Task(BaseTask):
     def __init__(self, cfg: TaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):
+        if mode == "eval":
+            cfg.adaptive_grasp_depth_threshold = 28.0
         super().__init__(cfg, mode, render_mode, **kwargs)
 
     def create_actors(self):

@@ -348,8 +348,9 @@ class VisionTactileSensorUIPC:
         original_point_num = marker_flow.shape[1]
 
         if original_point_num >= self.num_markers:
-            chosen = np.random.choice(original_point_num, self.num_markers, replace=False)
-            ret = marker_flow[:, chosen, ...]
+            # chosen = np.random.choice(original_point_num, self.num_markers, replace=False)
+            # ret = marker_flow[:, chosen, ...]
+            ret = marker_flow[:, :self.num_markers, :]
         else:
             ret = np.zeros((marker_flow.shape[0], self.num_markers, marker_flow.shape[-1]))
             if original_point_num > 0:
